@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>天野塗装 — 帳票作成ツール</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f5f0eb;
+  --bg-card: #ffffff;
+  --bg-input: #faf8f5;
+  --border: #e0d8cf;
+  --border-focus: #8b4513;
+  --text: #2c2419;
+  --text-muted: #8c7e6e;
+  --text-light: #b5a899;
+  --accent: #8b3a2a;
+  --accent-light: #c4604e;
+  --accent-bg: rgba(139,58,42,0.06);
+  --accent-bg-strong: rgba(139,58,42,0.12);
+  --shadow-sm: 0 1px 3px rgba(44,36,25,0.06);
+  --shadow-md: 0 4px 12px rgba(44,36,25,0.08);
+  --shadow-lg: 0 8px 30px rgba(44,36,25,0.12);
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font-body: 'Noto Sans JP', sans-serif;
+  --font-doc: 'Noto Serif JP', serif;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+html { font-size:15px; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text);
+  min-height:100vh;
+  min-height:100dvh;
+  overscroll-behavior:none;
+}
+
+/* ── Header ── */
+.app-header {
+  position:sticky; top:0; z-index:100;
+  background: linear-gradient(135deg, #2c2419 0%, #3d3228 100%);
+  padding: 14px 16px 0;
+  box-shadow: 0 2px 20px rgba(0,0,0,0.15);
+}
+
+.app-header .brand {
+  display:flex; align-items:center; gap:10px;
+  padding-bottom:14px;
+}
+
+.brand-icon {
+  width:34px; height:34px;
+  background: var(--accent);
+  border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; color:#fff;
+  box-shadow: 0 2px 8px rgba(139,58,42,0.4);
+  position:relative; overflow:hidden;
+}
+.brand-icon::after {
+  content:''; position:absolute; inset:0;
+  background: linear-gradient(135deg, transparent 40%, rgba(255,255,255,0.15));
+}
+
+.brand-text {
+  display:flex; flex-direction:column;
+}
+.brand-name {
+  font-size:17px; font-weight:700; color:#fff;
+  letter-spacing:0.08em;
+  font-family: var(--font-doc);
+}
+.brand-sub {
+  font-size:10px; color:rgba(255,255,255,0.45);
+  letter-spacing:0.15em; margin-top:1px;
+}
+
+/* ── Tabs ── */
+.tabs {
+  display:flex; gap:2px;
+  margin: 0 -4px;
+}
+
+.tab-btn {
+  flex:1;
+  background:transparent;
+  border:none;
+  padding:10px 4px 12px;
+  font-family:var(--font-body);
+  font-size:12px;
+  font-weight:500;
+  color:rgba(255,255,255,0.45);
+  cursor:pointer;
+  position:relative;
+  transition: color 0.2s;
+  letter-spacing:0.04em;
+}
+.tab-btn.active {
+  color:#fff;
+}
+.tab-btn::after {
+  content:'';
+  position:absolute; bottom:0; left:12%; right:12%;
+  height:2.5px;
+  background:var(--accent);
+  border-radius:2px 2px 0 0;
+  transform:scaleX(0);
+  transition:transform 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+.tab-btn.active::after {
+  transform:scaleX(1);
+}
+
+/* ── Main content ── */
+.main {
+  padding:16px;
+  padding-bottom: calc(env(safe-area-inset-bottom, 16px) + 80px);
+}
+
+.panel { display:none; }
+.panel.active { display:block; animation: fadeUp 0.3s ease; }
+
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(8px); }
+  to { opacity:1; transform:translateY(0); }
+}
+
+/* ── Card ── */
+.card {
+  background:var(--bg-card);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow-sm);
+  border:1px solid var(--border);
+  margin-bottom:14px;
+  overflow:hidden;
+}
+
+.card-head {
+  display:flex; align-items:center; gap:8px;
+  padding:12px 14px;
+  border-bottom:1px solid var(--border);
+  background: linear-gradient(180deg, #faf8f5, #f7f3ee);
+}
+.card-head-icon {
+  width:26px; height:26px;
+  background:var(--accent-bg-strong);
+  border-radius:6px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px;
+  color:var(--accent);
+  flex-shrink:0;
+}
+.card-head h3 {
+  font-size:13px; font-weight:600;
+  letter-spacing:0.03em;
+}
+
+.card-body { padding:14px; }
+
+/* ── Form ── */
+.field {
+  margin-bottom:14px;
+}
+.field:last-child { margin-bottom:0; }
+
+.field label {
+  display:block;
+  font-size:11px;
+  font-weight:600;
+  color:var(--text-muted);
+  margin-bottom:5px;
+  letter-spacing:0.06em;
+}
+
+.field input, .field select, .field textarea {
+  width:100%;
+  padding:10px 12px;
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  font-family:var(--font-body);
+  font-size:15px;
+  color:var(--text);
+  background:var(--bg-input);
+  transition:border-color 0.2s, box-shadow 0.2s;
+  -webkit-appearance:none;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  outline:none;
+  border-color:var(--border-focus);
+  box-shadow:0 0 0 3px rgba(139,58,42,0.08);
+}
+.field textarea { resize:vertical; min-height:60px; }
+.field select {
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238c7e6e' fill='none' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right 12px center;
+  padding-right:32px;
+}
+
+.row { display:flex; gap:10px; }
+.row .field { flex:1; }
+
+/* ── Items table ── */
+.items-list { margin-bottom:14px; }
+
+.item-row {
+  display:grid;
+  grid-template-columns: 1fr 60px 80px 32px;
+  gap:6px;
+  align-items:end;
+  margin-bottom:8px;
+  padding:10px;
+  background:var(--bg-input);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+}
+.item-row.header {
+  background:transparent;
+  border:none;
+  padding:0 10px 4px;
+  margin-bottom:4px;
+}
+.item-row.header span {
+  font-size:10px;
+  font-weight:600;
+  color:var(--text-muted);
+  letter-spacing:0.06em;
+}
+
+.item-row input {
+  width:100%;
+  padding:6px 8px;
+  border:1px solid transparent;
+  border-radius:4px;
+  font-family:var(--font-body);
+  font-size:14px;
+  color:var(--text);
+  background:var(--bg-card);
+  transition:border-color 0.2s;
+}
+.item-row input:focus {
+  outline:none;
+  border-color:var(--border-focus);
+}
+.item-row input[type="number"] { text-align:right; }
+
+.btn-remove {
+  width:28px; height:28px;
+  border:none;
+  background:transparent;
+  color:var(--text-light);
+  font-size:18px;
+  cursor:pointer;
+  border-radius:4px;
+  display:flex; align-items:center; justify-content:center;
+  transition:background 0.15s, color 0.15s;
+  margin-bottom:2px;
+}
+.btn-remove:hover { background:rgba(139,58,42,0.08); color:var(--accent); }
+
+.btn-add {
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  width:100%;
+  padding:10px;
+  border:1.5px dashed var(--border);
+  border-radius:var(--radius-sm);
+  background:transparent;
+  font-family:var(--font-body);
+  font-size:13px;
+  font-weight:500;
+  color:var(--text-muted);
+  cursor:pointer;
+  transition:border-color 0.2s, color 0.2s, background 0.2s;
+}
+.btn-add:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-bg); }
+
+/* ── Totals ── */
+.totals {
+  border-top:1px solid var(--border);
+  padding-top:12px;
+  margin-top:12px;
+}
+.total-row {
+  display:flex; justify-content:space-between;
+  padding:4px 0;
+  font-size:13px;
+  color:var(--text-muted);
+}
+.total-row.grand {
+  padding-top:10px;
+  margin-top:6px;
+  border-top:2px solid var(--text);
+  font-size:17px;
+  font-weight:700;
+  color:var(--text);
+}
+.total-row .amount { font-weight:600; }
+
+/* ── Generate button ── */
+.btn-generate {
+  position:fixed;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+  left:16px; right:16px;
+  padding:15px;
+  background: linear-gradient(135deg, var(--accent) 0%, #a0442f 100%);
+  color:#fff;
+  border:none;
+  border-radius:var(--radius);
+  font-family:var(--font-body);
+  font-size:15px;
+  font-weight:600;
+  letter-spacing:0.06em;
+  cursor:pointer;
+  box-shadow: 0 4px 20px rgba(139,58,42,0.35);
+  transition:transform 0.15s, box-shadow 0.15s;
+  z-index:90;
+}
+.btn-generate:active {
+  transform:scale(0.98);
+  box-shadow: 0 2px 10px rgba(139,58,42,0.25);
+}
+
+/* ── Envelope specifics ── */
+.envelope-preview {
+  border:2px solid var(--text);
+  border-radius:4px;
+  padding:20px;
+  margin:14px 0;
+  min-height:200px;
+  position:relative;
+  background:#fff;
+  font-family:var(--font-doc);
+}
+.envelope-preview .postal-mark {
+  position:absolute;
+  top:12px; right:14px;
+  display:flex; gap:6px;
+}
+.envelope-preview .postal-mark .box {
+  width:22px; height:30px;
+  border:1.5px solid #c44;
+  border-radius:2px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:15px; color:var(--text);
+  font-family:var(--font-doc);
+}
+.envelope-preview .to-address {
+  writing-mode:vertical-rl;
+  position:absolute;
+  top:50px; right:50%;
+  font-size:16px;
+  line-height:2;
+  letter-spacing:0.1em;
+}
+.envelope-preview .to-name {
+  writing-mode:vertical-rl;
+  position:absolute;
+  top:50px;
+  right:25%;
+  font-size:20px;
+  font-weight:600;
+  line-height:1.8;
+  letter-spacing:0.12em;
+}
+.envelope-preview .to-suffix {
+  font-size:14px; font-weight:400;
+}
+.envelope-preview .from-section {
+  writing-mode:vertical-rl;
+  position:absolute;
+  bottom:16px; left:12px;
+  display:flex; gap:12px;
+  font-size:11px;
+  line-height:1.8;
+}
+.envelope-preview .from-name {
+  font-size:13px; font-weight:600;
+}
+
+/* ── Print preview overlay ── */
+.print-overlay {
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index:1000;
+  background: rgba(44,36,25,0.6);
+  backdrop-filter:blur(4px);
+  -webkit-backdrop-filter:blur(4px);
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
+.print-overlay.show { display:flex; flex-direction:column; align-items:center; }
+
+.print-toolbar {
+  position:sticky; top:0; z-index:10;
+  width:100%;
+  display:flex; gap:10px; justify-content:center;
+  padding:14px 16px;
+  background:rgba(44,36,25,0.9);
+  backdrop-filter:blur(8px);
+}
+.print-toolbar button {
+  padding:10px 20px;
+  border:none;
+  border-radius:var(--radius-sm);
+  font-family:var(--font-body);
+  font-size:14px;
+  font-weight:600;
+  cursor:pointer;
+  transition:transform 0.1s;
+}
+.print-toolbar button:active { transform:scale(0.96); }
+.btn-print { background:var(--accent); color:#fff; }
+.btn-close-preview { background:rgba(255,255,255,0.15); color:#fff; }
+
+.print-page {
+  width:210mm;
+  min-height:297mm;
+  background:#fff;
+  margin:16px;
+  padding:20mm 15mm;
+  box-shadow:var(--shadow-lg);
+  font-family:var(--font-doc);
+  color:#111;
+  position:relative;
+}
+
+.print-page-envelope {
+  min-height: auto;
+}
+.print-page-envelope.naga3 {
+  width:120mm; min-height:235mm;
+}
+.print-page-envelope.kaku2 {
+  width:240mm; min-height:332mm;
+}
+
+/* ── Print document styles ── */
+.doc-title {
+  text-align:center;
+  font-size:28px;
+  font-weight:700;
+  letter-spacing:0.2em;
+  margin-bottom:8mm;
+  padding-bottom:4mm;
+  border-bottom:3px double #111;
+}
+
+.doc-meta {
+  display:flex;
+  justify-content:space-between;
+  margin-bottom:8mm;
+  font-size:12px;
+}
+.doc-meta .left { font-size:16px; }
+.doc-meta .left .customer-name {
+  font-size:20px;
+  font-weight:600;
+  border-bottom:1px solid #111;
+  padding-bottom:2px;
+  display:inline-block;
+}
+.doc-meta .left .sama {
+  font-size:16px; font-weight:400; margin-left:8px;
+}
+.doc-meta .right {
+  text-align:right;
+  line-height:1.8;
+}
+.doc-number { font-size:11px; color:#555; }
+
+.doc-amount-box {
+  border:2px solid #111;
+  padding:8px 16px;
+  margin:6mm 0 8mm;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-size:22px;
+  font-weight:700;
+}
+.doc-amount-box .label {
+  font-size:14px;
+  font-weight:600;
+}
+
+.doc-table {
+  width:100%;
+  border-collapse:collapse;
+  margin-bottom:6mm;
+  font-size:12px;
+}
+.doc-table th {
+  background:#f5f0eb;
+  border:1px solid #999;
+  padding:6px 8px;
+  font-weight:600;
+  text-align:center;
+  font-size:11px;
+}
+.doc-table td {
+  border:1px solid #bbb;
+  padding:5px 8px;
+}
+.doc-table td.num { text-align:right; }
+.doc-table tfoot td {
+  border-top:2px solid #111;
+  font-weight:600;
+}
+
+.doc-notes {
+  margin-top:8mm;
+  padding:4mm;
+  border:1px solid #ccc;
+  font-size:11px;
+  line-height:1.8;
+  min-height:20mm;
+}
+.doc-notes-title {
+  font-weight:600;
+  margin-bottom:2mm;
+  font-size:12px;
+}
+
+.doc-stamp-area {
+  position:absolute;
+  top:22mm;
+  right:15mm;
+  display:flex;
+  gap:3mm;
+}
+.stamp-box {
+  width:18mm;
+  height:22mm;
+  border:1px solid #999;
+  display:flex;
+  flex-direction:column;
+}
+.stamp-box .stamp-label {
+  text-align:center;
+  font-size:8px;
+  border-bottom:1px solid #999;
+  padding:1mm 0;
+  background:#f9f6f2;
+}
+.stamp-box .stamp-space {
+  flex:1;
+}
+
+.doc-company-info {
+  font-size:11px;
+  line-height:2;
+  text-align:right;
+}
+.doc-company-name {
+  font-size:16px;
+  font-weight:700;
+  letter-spacing:0.1em;
+}
+
+.doc-footer {
+  position:absolute;
+  bottom:15mm;
+  left:15mm;
+  right:15mm;
+  text-align:center;
+  font-size:9px;
+  color:#999;
+  border-top:1px solid #ddd;
+  padding-top:3mm;
+}
+
+/* receipt specific */
+.receipt-proviso {
+  font-size:11px;
+  margin-top:5mm;
+  line-height:1.8;
+}
+
+/* Envelope print */
+.env-print {
+  font-family: var(--font-doc);
+  position:relative;
+  width:100%;
+  height:100%;
+}
+.env-print .postal-code {
+  position:absolute;
+  top:8mm;
+  right:10mm;
+  font-size:20px;
+  letter-spacing:4mm;
+  font-family:var(--font-body);
+}
+.env-print .to-addr {
+  writing-mode:vertical-rl;
+  position:absolute;
+  top:30mm;
+  right:35%;
+  font-size:16px;
+  line-height:2.5;
+  letter-spacing:0.1em;
+}
+.env-print .to-nm {
+  writing-mode:vertical-rl;
+  position:absolute;
+  top:30mm;
+  right:15%;
+  font-size:22px;
+  font-weight:700;
+  line-height:2;
+  letter-spacing:0.12em;
+}
+.env-print .from-postal {
+  writing-mode:vertical-rl;
+  position:absolute;
+  bottom:50mm;
+  left:8mm;
+  font-size:10px;
+  letter-spacing:1mm;
+}
+.env-print .from-addr-text {
+  writing-mode:vertical-rl;
+  position:absolute;
+  bottom:20mm;
+  left:18mm;
+  font-size:11px;
+  line-height:2;
+}
+.env-print .from-nm {
+  writing-mode:vertical-rl;
+  position:absolute;
+  bottom:20mm;
+  left:30mm;
+  font-size:14px;
+  font-weight:700;
+  line-height:2;
+}
+
+/* ── Print media ── */
+@media print {
+  body * { visibility:hidden; }
+  .print-overlay, .print-overlay * { visibility:visible; }
+  .print-toolbar { display:none !important; }
+  .print-overlay {
+    position:static;
+    background:transparent;
+    backdrop-filter:none;
+  }
+  .print-page {
+    margin:0;
+    box-shadow:none;
+    page-break-after:always;
+  }
+  @page { margin:0; }
+}
+
+/* ── Responsive scaling for small screens ── */
+@media (max-width:500px) {
+  .print-page {
+    width:100vw;
+    min-height:auto;
+    padding:10mm 8mm;
+    margin:8px;
+    font-size:11px;
+  }
+  .doc-title { font-size:22px; }
+  .doc-amount-box { font-size:18px; }
+  .doc-meta .left .customer-name { font-size:16px; }
+  .doc-table { font-size:10px; }
+}
+
+/* ── Noto Serif fallback ── */
+.noto-serif { font-family: var(--font-doc); }
+</style>
+</head>
+<body>
+
+<!-- ━━ Header ━━ -->
+<header class="app-header">
+  <div class="brand">
+    <div class="brand-icon">塗</div>
+    <div class="brand-text">
+      <span class="brand-name">天野塗装</span>
+      <span class="brand-sub">帳票作成ツール</span>
+    </div>
+  </div>
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="estimate" onclick="switchTab('estimate')">見積書</button>
+    <button class="tab-btn" data-tab="invoice" onclick="switchTab('invoice')">請求書</button>
+    <button class="tab-btn" data-tab="receipt" onclick="switchTab('receipt')">領収書</button>
+    <button class="tab-btn" data-tab="envelope" onclick="switchTab('envelope')">封筒</button>
+  </nav>
+</header>
+
+<main class="main">
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━ 見積書 ━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<div class="panel active" id="panel-estimate">
+  <div class="card">
+    <div class="card-head">
+      <div class="card-head-icon">📋</div>
+      <h3>基本情報</h3>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="field">
+          <label>見積日</label>
+          <input type="date" id="est-date">
+        </div>
+        <div class="field">
+          <label>見積番号</label>
+          <input type="text" id="est-number" placeholder="EST-001">
+        </div>
+      </div>
+      <div class="field">
+        <label>宛名（お客様名）</label>
+        <input type="text" id="est-customer" placeholder="株式会社○○">
+      </div>
+      <div class="field">
+        <label>件名</label>
+        <input type="text" id="est-subject" placeholder="外壁塗装工事">
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>有効期限</label>
+          <input type="date" id="est-expiry">
+        </div>
+        <div class="field">
+          <label>納期</label>
+          <input type="text" id="est-delivery" placeholder="ご契約後2週間">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-head-icon">📝</div>
+      <h3>明細</h3>
+    </div>
+    <div class="card-body">
+      <div class="item-row header">
+        <span>品名・作業内容</span>
+        <span>数量</span>
+        <span>単価</span>
+        <span></span>
+      </div>
+      <div class="items-list" id="est-items">
+        <div class="item-row">
+          <input type="text" placeholder="下地処理" oninput="calcTotals('est')">
+          <input type="number" value="1" min="0" oninput="calcTotals('est')">
+          <input type="number" value="0" min="0" oninput="calcTotals('est')">
+          <button class="btn-remove" onclick="removeItem(this,'est')" aria-label="削除">×</button>
+        </div>
+      </div>
+      <button class="btn-add" onclick="addItem('est')">＋ 行を追加</button>
+      <div class="totals" id="est-totals">
+        <div class="total-row"><span>小計</span><span class="amount" id="est-subtotal">¥0</span></div>
+        <div class="total-row"><span>消費税（10%）</span><span class="amount" id="est-tax">¥0</span></div>
+        <div class="total-row grand"><span>合計金額</span><span class="amount" id="est-total">¥0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-head-icon">💬</div>
+      <h3>備考</h3>
+    </div>
+    <div class="card-body">
+      <div class="field">
+        <textarea id="est-notes" rows="3" placeholder="お支払い条件、特記事項など"></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━ 請求書 ━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<div class="panel" id="panel-invoice">
+  <div class="card">
+    <div class="card-head">
+      <div class="card-head-icon">📋</div>
+      <h3>基本情報</h3>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="field">
+          <label>請求日</label>
+          <input type="date" id="inv-date">
+        </div>
+        <div class="field">
+          <label>請求番号</label>
+          <input type="text" id="inv-number" placeholder="INV-001">
+        </div>
+      </div>
+      <div class="field">
+        <label>宛名（お客様名）</label>
+        <input type="text" id="inv-customer" placeholder="株式会社○○">
+      </div>
+      <div class="field">
+        <label>件名</label>
+        <input type="text" id="inv-subject" placeholder="外壁塗装工事">
+      </div>
+      <div class="field">
+        <label>お支払期限</label>
+        <input type="date" id="inv-due">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-head-icon">📝</div>
+      <h3>明細</h3>
+    </div>
+    <div class="card-body">
+      <div class="item-row header">
+        <span>品名・作業内容</span>
+        <span>数量</span>
+        <span>単価</span>
+        <span></span>
+      </div>
+      <div class="items-list" id="inv-items">
+        <div class="item-row">
+          <input type="text" placeholder="外壁塗装" oninput="calcTotals('inv')">
+          <input type="number" value="1" min="0" oninput="calcTotals('inv')">
+          <input type="number" value="0" min="0" oninput="calcTotals('inv')">
+          <button class="btn-remove" onclick="removeItem(this,'inv')" aria-label="削除">×</button>
+        </div>
+      </div>
+      <button class="btn-add" onclick="addItem('inv')">＋ 行を追加</button>
+      <div class="totals" id="inv-totals">
+        <div class="total-row"><span>小計</span><span class="amount" id="inv-subtotal">¥0</span></div>
+        <div class="total-row"><span>消費税（10%）</span><span class="amount" id="inv-tax">¥0</span></div>
+        <div class="total-row grand"><span>合計金額</span><span class="amount" id="inv-total">¥0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-head-icon">🏦</div>
+      <h3>振込先</h3>
+    </div>
+    <div class="card-body">
+      <div class="field">
+        <label>銀行名</label>
+        <input type="text" id="inv-bank" placeholder="○○銀行 ○○支店">
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>口座種別</label>
+          <select id="inv-actype">
+            <option>普通</option>
+            <option>当座</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>口座番号</label>
+          <input type="text" id="inv-acnum" placeholder="1234567">
+        </div>
+      </div>
+      <div class="field">
+        <label>口座名義</label>
+        <input type="text" id="inv-acname" placeholder="アマノトソウ">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-head-icon">💬</div>
+      <h3>備考</h3>
+    </div>
+    <div class="card-body">
+      <div class="field">
+        <textarea id="inv-notes" rows="3" placeholder="備考・特記事項"></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━ 領収書 ━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<div class="panel" id="panel-receipt">
+  <div class="card">
+    <div class="card-head">
+      <div class="card-head-icon">📋</div>
+      <h3>基本情報</h3>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="field">
+          <label>発行日</label>
+          <input type="date" id="rec-date">
+        </div>
+        <div class="field">
+          <label>領収書番号</label>
+          <input type="text" id="rec-number" placeholder="REC-001">
+        </div>
+      </div>
+      <div class="field">
+        <label>宛名（お客様名）</label>
+        <input type="text" id="rec-customer" placeholder="株式会社○○">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-head-icon">💰</div>
+      <h3>金額</h3>
+    </div>
+    <div class="card-body">
+      <div class="field">
+        <label>領収金額（税込）</label>
+        <input type="number" id="rec-amount" placeholder="0" oninput="calcReceipt()">
+      </div>
+      <div class="totals">
+        <div class="total-row"><span>税抜金額</span><span class="amount" id="rec-subtotal">¥0</span></div>
+        <div class="total-row"><span>消費税（10%）</span><span class="amount" id="rec-tax">¥0</span></div>
+        <div class="total-row grand"><span>領収金額</span><span class="amount" id="rec-total">¥0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-head-icon">📝</div>
+      <h3>但し書き・備考</h3>
+    </div>
+    <div class="card-body">
+      <div class="field">
+        <label>但し書き</label>
+        <input type="text" id="rec-proviso" placeholder="塗装工事代として">
+      </div>
+      <div class="field">
+        <label>備考</label>
+        <textarea id="rec-notes" rows="2" placeholder="備考・特記事項"></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ━━━━━━━━━━━━━━━━━━━━━━━━━━━ 封筒 ━━━━━━━━━━━━━━━━━━━━━━━━━━━ -->
+<div class="panel" id="panel-envelope">
+  <div class="card">
+    <div class="card-head">
+      <div class="card-head-icon">✉️</div>
+      <h3>封筒サイズ</h3>
+    </div>
+    <div class="card-body">
+      <div class="field">
+        <label>封筒種類</label>
+        <select id="env-size" onchange="updateEnvelopePreview()">
+          <option value="naga3">長形3号（120×235mm）</option>
+          <option value="kaku2">角形2号（240×332mm）</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-head-icon">👤</div>
+      <h3>宛先</h3>
+    </div>
+    <div class="card-body">
+      <div class="field">
+        <label>郵便番号</label>
+        <input type="text" id="env-to-postal" placeholder="123-4567" oninput="updateEnvelopePreview()">
+      </div>
+      <div class="field">
+        <label>住所</label>
+        <textarea id="env-to-addr" rows="2" placeholder="東京都○○区○○町1-2-3" oninput="updateEnvelopePreview()"></textarea>
+      </div>
+      <div class="field">
+        <label>宛名</label>
+        <input type="text" id="env-to-name" placeholder="株式会社○○" oninput="updateEnvelopePreview()">
+      </div>
+      <div class="field">
+        <label>敬称</label>
+        <select id="env-to-suffix" onchange="updateEnvelopePreview()">
+          <option value="御中">御中</option>
+          <option value="様">様</option>
+          <option value="殿">殿</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-head-icon">🏠</div>
+      <h3>差出人（天野塗装）</h3>
+    </div>
+    <div class="card-body">
+      <div class="field">
+        <label>郵便番号</label>
+        <input type="text" id="env-from-postal" placeholder="987-6543" oninput="updateEnvelopePreview()">
+      </div>
+      <div class="field">
+        <label>住所</label>
+        <textarea id="env-from-addr" rows="2" placeholder="○○県○○市○○1-2-3" oninput="updateEnvelopePreview()"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <div class="card-head-icon">👁</div>
+      <h3>プレビュー</h3>
+    </div>
+    <div class="card-body">
+      <div class="envelope-preview" id="env-preview">
+        <div class="postal-mark" id="env-postal-boxes"></div>
+        <div class="to-address" id="env-preview-addr">住所</div>
+        <div class="to-name" id="env-preview-name">宛名 <span class="to-suffix" id="env-preview-suffix">御中</span></div>
+        <div class="from-section">
+          <div id="env-preview-from-postal" style="font-size:10px;"></div>
+          <div id="env-preview-from-addr">差出人住所</div>
+          <div class="from-name">天野塗装</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<!-- ━━ Generate Button ━━ -->
+<button class="btn-generate" onclick="generate()">プレビュー・印刷</button>
+
+<!-- ━━ Print Overlay ━━ -->
+<div class="print-overlay" id="printOverlay">
+  <div class="print-toolbar">
+    <button class="btn-print" onclick="window.print()">🖨 印刷 / PDF保存</button>
+    <button class="btn-close-preview" onclick="closePreview()">✕ 閉じる</button>
+  </div>
+  <div id="printContent"></div>
+</div>
+
+<script>
+// ── Utilities ──
+const $ = id => document.getElementById(id);
+const today = () => { const d=new Date(); return d.toISOString().split('T')[0]; };
+const fmtDate = d => { if(!d) return ''; const p=d.split('-'); return `${p[0]}年${parseInt(p[1])}月${parseInt(p[2])}日`; };
+const fmtYen = n => '¥' + Math.floor(n).toLocaleString('ja-JP');
+
+// Init dates
+document.addEventListener('DOMContentLoaded', () => {
+  const t = today();
+  ['est-date','inv-date','rec-date'].forEach(id => { if($(id)) $(id).value = t; });
+  const exp = new Date(); exp.setMonth(exp.getMonth()+1);
+  $('est-expiry').value = exp.toISOString().split('T')[0];
+  const due = new Date(); due.setMonth(due.getMonth()+1);
+  $('inv-due').value = due.toISOString().split('T')[0];
+  updateEnvelopePreview();
+});
+
+// ── Tab switching ──
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab===tab));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id==='panel-'+tab));
+}
+
+// ── Items management ──
+function addItem(prefix) {
+  const list = $(prefix+'-items');
+  const row = document.createElement('div');
+  row.className = 'item-row';
+  row.innerHTML = `
+    <input type="text" placeholder="作業内容" oninput="calcTotals('${prefix}')">
+    <input type="number" value="1" min="0" oninput="calcTotals('${prefix}')">
+    <input type="number" value="0" min="0" oninput="calcTotals('${prefix}')">
+    <button class="btn-remove" onclick="removeItem(this,'${prefix}')" aria-label="削除">×</button>
+  `;
+  list.appendChild(row);
+}
+
+function removeItem(btn, prefix) {
+  const list = $(prefix+'-items');
+  if(list.children.length > 1) {
+    btn.closest('.item-row').remove();
+    calcTotals(prefix);
+  }
+}
+
+function getItems(prefix) {
+  const rows = $(prefix+'-items').querySelectorAll('.item-row');
+  const items = [];
+  rows.forEach(r => {
+    const inputs = r.querySelectorAll('input');
+    const name = inputs[0].value || '';
+    const qty = parseFloat(inputs[1].value) || 0;
+    const price = parseFloat(inputs[2].value) || 0;
+    items.push({ name, qty, price, amount: qty * price });
+  });
+  return items;
+}
+
+function calcTotals(prefix) {
+  const items = getItems(prefix);
+  const subtotal = items.reduce((s,i) => s + i.amount, 0);
+  const tax = Math.floor(subtotal * 0.1);
+  const total = subtotal + tax;
+  $(prefix+'-subtotal').textContent = fmtYen(subtotal);
+  $(prefix+'-tax').textContent = fmtYen(tax);
+  $(prefix+'-total').textContent = fmtYen(total);
+}
+
+function calcReceipt() {
+  const total = parseFloat($('rec-amount').value) || 0;
+  const subtotal = Math.floor(total / 1.1);
+  const tax = total - subtotal;
+  $('rec-subtotal').textContent = fmtYen(subtotal);
+  $('rec-tax').textContent = fmtYen(tax);
+  $('rec-total').textContent = fmtYen(total);
+}
+
+// ── Envelope preview ──
+function updateEnvelopePreview() {
+  const postal = $('env-to-postal').value;
+  const digits = postal.replace(/\D/g,'');
+  let boxes = '';
+  for(let i=0; i<7; i++) {
+    boxes += `<div class="box">${digits[i]||''}</div>`;
+  }
+  $('env-postal-boxes').innerHTML = boxes;
+  $('env-preview-addr').textContent = $('env-to-addr').value || '住所';
+  $('env-preview-name').innerHTML = ($('env-to-name').value || '宛名') + ' <span class="to-suffix">' + $('env-to-suffix').value + '</span>';
+  $('env-preview-from-postal').textContent = '〒' + ($('env-from-postal').value || '');
+  $('env-preview-from-addr').textContent = $('env-from-addr').value || '差出人住所';
+}
+
+// ── Company info block ──
+function companyBlock() {
+  return `
+    <div class="doc-company-info">
+      <div class="doc-company-name">天野塗装</div>
+      <div id="company-addr-line"></div>
+      <div id="company-tel-line"></div>
+    </div>
+  `;
+}
+
+function stampArea() {
+  return `
+    <div class="doc-stamp-area">
+      <div class="stamp-box"><div class="stamp-label">承認</div><div class="stamp-space"></div></div>
+      <div class="stamp-box"><div class="stamp-label">確認</div><div class="stamp-space"></div></div>
+      <div class="stamp-box"><div class="stamp-label">担当</div><div class="stamp-space"></div></div>
+    </div>
+  `;
+}
+
+// ── Generate documents ──
+function generate() {
+  const active = document.querySelector('.panel.active').id.replace('panel-','');
+  let html = '';
+
+  if(active === 'estimate') {
+    html = generateEstimate();
+  } else if(active === 'invoice') {
+    html = generateInvoice();
+  } else if(active === 'receipt') {
+    html = generateReceipt();
+  } else if(active === 'envelope') {
+    html = generateEnvelope();
+  }
+
+  $('printContent').innerHTML = html;
+  $('printOverlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
+}
+
+function closePreview() {
+  $('printOverlay').classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+function itemsTableHTML(prefix) {
+  const items = getItems(prefix);
+  const subtotal = items.reduce((s,i) => s + i.amount, 0);
+  const tax = Math.floor(subtotal * 0.1);
+  const total = subtotal + tax;
+  let rows = items.map(i => `
+    <tr>
+      <td>${esc(i.name)}</td>
+      <td class="num">${i.qty}</td>
+      <td class="num">${fmtYen(i.price)}</td>
+      <td class="num">${fmtYen(i.amount)}</td>
+    </tr>
+  `).join('');
+  // Add empty rows to fill at least 5 rows
+  const empty = Math.max(0, 5 - items.length);
+  for(let i=0; i<empty; i++) {
+    rows += `<tr><td>&nbsp;</td><td></td><td></td><td></td></tr>`;
+  }
+  return `
+    <table class="doc-table">
+      <thead>
+        <tr><th style="width:50%">品名・作業内容</th><th style="width:12%">数量</th><th style="width:19%">単価</th><th style="width:19%">金額</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+      <tfoot>
+        <tr><td colspan="3" style="text-align:right">小計</td><td class="num">${fmtYen(subtotal)}</td></tr>
+        <tr><td colspan="3" style="text-align:right">消費税（10%）</td><td class="num">${fmtYen(tax)}</td></tr>
+        <tr><td colspan="3" style="text-align:right;font-size:14px">合計金額</td><td class="num" style="font-size:14px">${fmtYen(total)}</td></tr>
+      </tfoot>
+    </table>
+  `;
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function generateEstimate() {
+  const items = getItems('est');
+  const subtotal = items.reduce((s,i) => s + i.amount, 0);
+  const tax = Math.floor(subtotal * 0.1);
+  const total = subtotal + tax;
+  return `
+    <div class="print-page">
+      ${stampArea()}
+      <div class="doc-title">見 積 書</div>
+      <div class="doc-meta">
+        <div class="left">
+          <span class="customer-name">${esc($('est-customer').value||'　')}</span><span class="sama"> 御中</span>
+          <br><br>
+          <div style="font-size:12px">件名：${esc($('est-subject').value||'')}</div>
+        </div>
+        <div class="right">
+          ${companyBlock()}
+          <br>
+          <div class="doc-number">見積番号：${esc($('est-number').value||'')}</div>
+          <div>見積日：${fmtDate($('est-date').value)}</div>
+          <div>有効期限：${fmtDate($('est-expiry').value)}</div>
+        </div>
+      </div>
+      <div class="doc-amount-box">
+        <span class="label">お見積金額（税込）</span>
+        <span>${fmtYen(total)}</span>
+      </div>
+      ${itemsTableHTML('est')}
+      <div style="font-size:11px;margin-top:4mm;">
+        <span>納期：${esc($('est-delivery').value||'別途ご相談')}</span>
+      </div>
+      ${$('est-notes').value ? `
+        <div class="doc-notes">
+          <div class="doc-notes-title">備考</div>
+          ${esc($('est-notes').value).replace(/\n/g,'<br>')}
+        </div>
+      ` : ''}
+      <div class="doc-footer">天野塗装</div>
+    </div>
+  `;
+}
+
+function generateInvoice() {
+  const items = getItems('inv');
+  const subtotal = items.reduce((s,i) => s + i.amount, 0);
+  const tax = Math.floor(subtotal * 0.1);
+  const total = subtotal + tax;
+  return `
+    <div class="print-page">
+      ${stampArea()}
+      <div class="doc-title">請 求 書</div>
+      <div class="doc-meta">
+        <div class="left">
+          <span class="customer-name">${esc($('inv-customer').value||'　')}</span><span class="sama"> 御中</span>
+          <br><br>
+          <div style="font-size:12px">件名：${esc($('inv-subject').value||'')}</div>
+        </div>
+        <div class="right">
+          ${companyBlock()}
+          <br>
+          <div class="doc-number">請求番号：${esc($('inv-number').value||'')}</div>
+          <div>請求日：${fmtDate($('inv-date').value)}</div>
+          <div>お支払期限：${fmtDate($('inv-due').value)}</div>
+        </div>
+      </div>
+      <div class="doc-amount-box">
+        <span class="label">ご請求金額（税込）</span>
+        <span>${fmtYen(total)}</span>
+      </div>
+      ${itemsTableHTML('inv')}
+      ${$('inv-bank').value ? `
+        <div class="doc-notes">
+          <div class="doc-notes-title">お振込先</div>
+          ${esc($('inv-bank').value)}<br>
+          ${esc($('inv-actype').value)}　口座番号：${esc($('inv-acnum').value)}<br>
+          口座名義：${esc($('inv-acname').value)}
+        </div>
+      ` : ''}
+      ${$('inv-notes').value ? `
+        <div class="doc-notes" style="margin-top:4mm;">
+          <div class="doc-notes-title">備考</div>
+          ${esc($('inv-notes').value).replace(/\n/g,'<br>')}
+        </div>
+      ` : ''}
+      <div class="doc-footer">天野塗装</div>
+    </div>
+  `;
+}
+
+function generateReceipt() {
+  const total = parseFloat($('rec-amount').value) || 0;
+  const subtotal = Math.floor(total / 1.1);
+  const tax = total - subtotal;
+  return `
+    <div class="print-page">
+      ${stampArea()}
+      <div class="doc-title">領 収 書</div>
+      <div class="doc-meta">
+        <div class="left">
+          <span class="customer-name">${esc($('rec-customer').value||'　')}</span><span class="sama"> 様</span>
+        </div>
+        <div class="right">
+          ${companyBlock()}
+          <br>
+          <div class="doc-number">領収書番号：${esc($('rec-number').value||'')}</div>
+          <div>発行日：${fmtDate($('rec-date').value)}</div>
+        </div>
+      </div>
+      <div class="doc-amount-box">
+        <span class="label">領収金額</span>
+        <span>${fmtYen(total)}</span>
+      </div>
+      <div class="receipt-proviso">
+        但し、${esc($('rec-proviso').value||'塗装工事代として')}
+      </div>
+      <div style="margin-top:6mm;">
+        <table class="doc-table">
+          <tr><th>税抜金額</th><th>消費税額（10%）</th><th>税込金額</th></tr>
+          <tr><td class="num">${fmtYen(subtotal)}</td><td class="num">${fmtYen(tax)}</td><td class="num">${fmtYen(total)}</td></tr>
+        </table>
+      </div>
+      ${$('rec-notes').value ? `
+        <div class="doc-notes" style="margin-top:6mm;">
+          <div class="doc-notes-title">備考</div>
+          ${esc($('rec-notes').value).replace(/\n/g,'<br>')}
+        </div>
+      ` : ''}
+      <div style="margin-top:12mm; text-align:right;">
+        <div style="display:inline-block; width:50mm; height:50mm; border:1px solid #ccc; text-align:center; line-height:50mm; font-size:10px; color:#999;">
+          印紙貼付欄
+        </div>
+      </div>
+      <div class="doc-footer">天野塗装　※この領収書は税務処理にご利用いただけます</div>
+    </div>
+  `;
+}
+
+function generateEnvelope() {
+  const size = $('env-size').value;
+  const sizeClass = size === 'naga3' ? 'naga3' : 'kaku2';
+  const postal = $('env-to-postal').value.replace(/\D/g,'');
+  const postalDisplay = postal ? '〒' + postal.slice(0,3) + '-' + postal.slice(3) : '';
+
+  return `
+    <div class="print-page print-page-envelope ${sizeClass}">
+      <div class="env-print">
+        <div class="postal-code">${postalDisplay}</div>
+        <div class="to-addr">${esc($('env-to-addr').value||'').replace(/\n/g,'<br>')}</div>
+        <div class="to-nm">${esc($('env-to-name').value||'')}　${$('env-to-suffix').value}</div>
+        <div class="from-postal">〒${esc($('env-from-postal').value||'')}</div>
+        <div class="from-addr-text">${esc($('env-from-addr').value||'').replace(/\n/g,'<br>')}</div>
+        <div class="from-nm">天野塗装</div>
+      </div>
+    </div>
+  `;
+}
+</script>
+</body>
+</html>
