@@ -8,6 +8,11 @@
 <title>天野塗装 — 帳票作成ツール</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet">
+<!-- Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<!-- html2canvas + jsPDF for PDF generation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root {
   --bg: #f5f0eb;
@@ -52,9 +57,13 @@ body {
   box-shadow: 0 2px 20px rgba(0,0,0,0.15);
 }
 
-.app-header .brand {
-  display:flex; align-items:center; gap:10px;
+.app-header .brand-row {
+  display:flex; align-items:center; justify-content:space-between;
   padding-bottom:14px;
+}
+
+.brand {
+  display:flex; align-items:center; gap:10px;
 }
 
 .brand-icon {
@@ -82,6 +91,72 @@ body {
 .brand-sub {
   font-size:10px; color:rgba(255,255,255,0.45);
   letter-spacing:0.15em; margin-top:1px;
+}
+
+/* ── User auth area ── */
+.auth-area {
+  display:flex; align-items:center; gap:8px;
+}
+
+.btn-google-login {
+  display:flex; align-items:center; gap:6px;
+  padding:7px 12px;
+  background:rgba(255,255,255,0.12);
+  border:1px solid rgba(255,255,255,0.2);
+  border-radius:20px;
+  color:#fff;
+  font-family:var(--font-body);
+  font-size:11px;
+  font-weight:500;
+  cursor:pointer;
+  transition:background 0.2s;
+}
+.btn-google-login:hover { background:rgba(255,255,255,0.2); }
+.btn-google-login svg { width:14px; height:14px; }
+
+.user-avatar {
+  width:30px; height:30px;
+  border-radius:50%;
+  border:2px solid rgba(255,255,255,0.3);
+  cursor:pointer;
+}
+
+.user-info {
+  display:flex; align-items:center; gap:8px;
+  position:relative;
+}
+
+.user-menu {
+  display:none;
+  position:absolute;
+  top:38px; right:0;
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  box-shadow:var(--shadow-lg);
+  min-width:160px;
+  z-index:200;
+  overflow:hidden;
+}
+.user-menu.show { display:block; }
+.user-menu-item {
+  display:block; width:100%;
+  padding:10px 14px;
+  border:none;
+  background:transparent;
+  font-family:var(--font-body);
+  font-size:13px;
+  color:var(--text);
+  text-align:left;
+  cursor:pointer;
+  transition:background 0.15s;
+}
+.user-menu-item:hover { background:var(--accent-bg); }
+.user-menu-name {
+  padding:10px 14px;
+  font-size:12px;
+  color:var(--text-muted);
+  border-bottom:1px solid var(--border);
 }
 
 /* ── Tabs ── */
@@ -305,29 +380,58 @@ body {
 }
 .total-row .amount { font-weight:600; }
 
-/* ── Generate button ── */
-.btn-generate {
+/* ── Action buttons ── */
+.action-buttons {
   position:fixed;
   bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
   left:16px; right:16px;
+  display:flex; gap:10px;
+  z-index:90;
+}
+
+.btn-generate {
+  flex:1;
   padding:15px;
   background: linear-gradient(135deg, var(--accent) 0%, #a0442f 100%);
   color:#fff;
   border:none;
   border-radius:var(--radius);
   font-family:var(--font-body);
-  font-size:15px;
+  font-size:14px;
   font-weight:600;
   letter-spacing:0.06em;
   cursor:pointer;
   box-shadow: 0 4px 20px rgba(139,58,42,0.35);
   transition:transform 0.15s, box-shadow 0.15s;
-  z-index:90;
 }
 .btn-generate:active {
   transform:scale(0.98);
   box-shadow: 0 2px 10px rgba(139,58,42,0.25);
 }
+
+.btn-drive-save {
+  padding:15px 18px;
+  background: linear-gradient(135deg, #1a73e8 0%, #1557b0 100%);
+  color:#fff;
+  border:none;
+  border-radius:var(--radius);
+  font-family:var(--font-body);
+  font-size:13px;
+  font-weight:600;
+  cursor:pointer;
+  box-shadow: 0 4px 20px rgba(26,115,232,0.3);
+  transition:transform 0.15s, box-shadow 0.15s, opacity 0.2s;
+  display:flex; align-items:center; gap:6px;
+  white-space:nowrap;
+}
+.btn-drive-save:active {
+  transform:scale(0.98);
+}
+.btn-drive-save:disabled {
+  opacity:0.5;
+  cursor:not-allowed;
+}
+.btn-drive-save svg { width:18px; height:18px; }
 
 /* ── Envelope specifics ── */
 .envelope-preview {
@@ -386,6 +490,42 @@ body {
   font-size:13px; font-weight:600;
 }
 
+/* ── Toast notification ── */
+.toast {
+  position:fixed;
+  top:80px; left:50%;
+  transform:translateX(-50%) translateY(-20px);
+  background:rgba(44,36,25,0.92);
+  color:#fff;
+  padding:12px 20px;
+  border-radius:var(--radius);
+  font-size:13px;
+  font-weight:500;
+  z-index:9999;
+  opacity:0;
+  transition:opacity 0.3s, transform 0.3s;
+  pointer-events:none;
+  max-width:90vw;
+  text-align:center;
+}
+.toast.show {
+  opacity:1;
+  transform:translateX(-50%) translateY(0);
+}
+.toast.success { background:rgba(34,120,60,0.92); }
+.toast.error { background:rgba(180,40,40,0.92); }
+
+/* ── Loading spinner ── */
+.spinner {
+  display:inline-block;
+  width:16px; height:16px;
+  border:2px solid rgba(255,255,255,0.3);
+  border-top-color:#fff;
+  border-radius:50%;
+  animation:spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+
 /* ── Print preview overlay ── */
 .print-overlay {
   display:none;
@@ -403,23 +543,26 @@ body {
 .print-toolbar {
   position:sticky; top:0; z-index:10;
   width:100%;
-  display:flex; gap:10px; justify-content:center;
+  display:flex; gap:8px; justify-content:center; flex-wrap:wrap;
   padding:14px 16px;
   background:rgba(44,36,25,0.9);
   backdrop-filter:blur(8px);
 }
 .print-toolbar button {
-  padding:10px 20px;
+  padding:10px 16px;
   border:none;
   border-radius:var(--radius-sm);
   font-family:var(--font-body);
-  font-size:14px;
+  font-size:13px;
   font-weight:600;
   cursor:pointer;
   transition:transform 0.1s;
+  display:flex; align-items:center; gap:6px;
 }
 .print-toolbar button:active { transform:scale(0.96); }
 .btn-print { background:var(--accent); color:#fff; }
+.btn-save-drive { background:#1a73e8; color:#fff; }
+.btn-save-drive:disabled { opacity:0.5; cursor:not-allowed; }
 .btn-close-preview { background:rgba(255,255,255,0.15); color:#fff; }
 
 .print-page {
@@ -678,20 +821,28 @@ body {
   .doc-meta .left .customer-name { font-size:16px; }
   .doc-table { font-size:10px; }
 }
-
-/* ── Noto Serif fallback ── */
-.noto-serif { font-family: var(--font-doc); }
 </style>
 </head>
 <body>
 
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
 <!-- ━━ Header ━━ -->
 <header class="app-header">
-  <div class="brand">
-    <div class="brand-icon">塗</div>
-    <div class="brand-text">
-      <span class="brand-name">天野塗装</span>
-      <span class="brand-sub">帳票作成ツール</span>
+  <div class="brand-row">
+    <div class="brand">
+      <div class="brand-icon">塗</div>
+      <div class="brand-text">
+        <span class="brand-name">天野塗装</span>
+        <span class="brand-sub">帳票作成ツール</span>
+      </div>
+    </div>
+    <div class="auth-area" id="authArea">
+      <button class="btn-google-login" id="btnLogin" onclick="googleLogin()">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        ログイン
+      </button>
     </div>
   </div>
   <nav class="tabs">
@@ -1037,26 +1188,320 @@ body {
 
 </main>
 
-<!-- ━━ Generate Button ━━ -->
-<button class="btn-generate" onclick="generate()">プレビュー・印刷</button>
+<!-- ━━ Action Buttons ━━ -->
+<div class="action-buttons">
+  <button class="btn-generate" onclick="generate()">プレビュー・印刷</button>
+  <button class="btn-drive-save" id="btnDriveSave" onclick="saveCurrentToDrive()" disabled title="Googleログインが必要です">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7.71 3.5L1.15 15l4.58 7.5h13.54l4.58-7.5L17.29 3.5H7.71zm-.2 1h2.27l-5.45 9.5h-2.27l5.45-9.5zm2.77 0h3.44l5.45 9.5h-3.44l-5.45-9.5zm4.94 0h2.27l5.45 9.5h-2.27l-5.45-9.5zM5.7 15.5l2.87 5H5.14l-2.87-5h3.43zm3.93 0h4.74l-2.87 5H8.76l.87-5zm5.24 0h3.43l-2.87 5h-3.43l2.87-5z"/></svg>
+    Drive保存
+  </button>
+</div>
 
 <!-- ━━ Print Overlay ━━ -->
 <div class="print-overlay" id="printOverlay">
   <div class="print-toolbar">
     <button class="btn-print" onclick="window.print()">🖨 印刷 / PDF保存</button>
+    <button class="btn-save-drive" id="btnDriveOverlay" onclick="saveToDriveFromPreview()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7.71 3.5L1.15 15l4.58 7.5h13.54l4.58-7.5L17.29 3.5H7.71zm-.2 1h2.27l-5.45 9.5h-2.27l5.45-9.5zm2.77 0h3.44l5.45 9.5h-3.44l-5.45-9.5zm4.94 0h2.27l5.45 9.5h-2.27l-5.45-9.5zM5.7 15.5l2.87 5H5.14l-2.87-5h3.43zm3.93 0h4.74l-2.87 5H8.76l.87-5zm5.24 0h3.43l-2.87 5h-3.43l2.87-5z"/></svg>
+      Drive保存
+    </button>
     <button class="btn-close-preview" onclick="closePreview()">✕ 閉じる</button>
   </div>
   <div id="printContent"></div>
 </div>
 
 <script>
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// CONFIG - Google Cloud OAuth Client ID
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const GOOGLE_CLIENT_ID = '887849576498-t4o0v86ur31hkvpflkkbuqh4r3k8d46r.apps.googleusercontent.com';
+const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// State
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+let accessToken = null;
+let currentUser = null;
+let tokenClient = null;
+
 // ── Utilities ──
 const $ = id => document.getElementById(id);
 const today = () => { const d=new Date(); return d.toISOString().split('T')[0]; };
 const fmtDate = d => { if(!d) return ''; const p=d.split('-'); return `${p[0]}年${parseInt(p[1])}月${parseInt(p[2])}日`; };
 const fmtYen = n => '¥' + Math.floor(n).toLocaleString('ja-JP');
 
-// Init dates
+function showToast(msg, type='') {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => { t.className = 'toast'; }, 3000);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Google Auth
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function initGoogleAuth() {
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_CLIENT_ID,
+    scope: SCOPES,
+    callback: handleTokenResponse,
+  });
+}
+
+function googleLogin() {
+  if (!tokenClient) {
+    // GIS not loaded yet
+    showToast('Google認証を読み込み中...少々お待ちください', '');
+    setTimeout(googleLogin, 500);
+    return;
+  }
+  tokenClient.requestAccessToken({ prompt: 'consent' });
+}
+
+function handleTokenResponse(response) {
+  if (response.error) {
+    showToast('ログインに失敗しました: ' + response.error, 'error');
+    return;
+  }
+  accessToken = response.access_token;
+  // Fetch user info
+  fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+    headers: { 'Authorization': 'Bearer ' + accessToken }
+  })
+  .then(r => r.json())
+  .then(user => {
+    currentUser = user;
+    updateAuthUI();
+    showToast(user.name + ' でログインしました', 'success');
+  })
+  .catch(() => {
+    showToast('ユーザー情報の取得に失敗しました', 'error');
+  });
+}
+
+function updateAuthUI() {
+  const area = $('authArea');
+  if (currentUser) {
+    area.innerHTML = `
+      <div class="user-info" id="userInfo">
+        <img class="user-avatar" src="${currentUser.picture}" alt="" onclick="toggleUserMenu()" referrerpolicy="no-referrer">
+        <div class="user-menu" id="userMenu">
+          <div class="user-menu-name">${esc(currentUser.name)}<br><small>${esc(currentUser.email)}</small></div>
+          <button class="user-menu-item" onclick="googleLogout()">ログアウト</button>
+        </div>
+      </div>
+    `;
+    $('btnDriveSave').disabled = false;
+    $('btnDriveSave').title = 'Google Driveに保存';
+    const overlayBtn = $('btnDriveOverlay');
+    if (overlayBtn) overlayBtn.disabled = false;
+  } else {
+    area.innerHTML = `
+      <button class="btn-google-login" id="btnLogin" onclick="googleLogin()">
+        <svg viewBox="0 0 24 24" fill="none" width="14" height="14"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        ログイン
+      </button>
+    `;
+    $('btnDriveSave').disabled = true;
+    $('btnDriveSave').title = 'Googleログインが必要です';
+  }
+}
+
+function toggleUserMenu() {
+  const menu = $('userMenu');
+  if (menu) menu.classList.toggle('show');
+}
+
+function googleLogout() {
+  if (accessToken) {
+    google.accounts.oauth2.revoke(accessToken);
+  }
+  accessToken = null;
+  currentUser = null;
+  updateAuthUI();
+  showToast('ログアウトしました');
+}
+
+// Close user menu on outside click
+document.addEventListener('click', e => {
+  const info = document.querySelector('.user-info');
+  if (info && !info.contains(e.target)) {
+    const menu = $('userMenu');
+    if (menu) menu.classList.remove('show');
+  }
+});
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// PDF Generation & Drive Upload
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function getDocTypeName() {
+  const active = document.querySelector('.panel.active').id.replace('panel-','');
+  const names = { estimate:'見積書', invoice:'請求書', receipt:'領収書', envelope:'封筒' };
+  return names[active] || '帳票';
+}
+
+function getFileName() {
+  const active = document.querySelector('.panel.active').id.replace('panel-','');
+  const d = today().replace(/-/g,'');
+  let customer = '';
+  if (active === 'estimate') customer = $('est-customer').value;
+  else if (active === 'invoice') customer = $('inv-customer').value;
+  else if (active === 'receipt') customer = $('rec-customer').value;
+  else if (active === 'envelope') customer = $('env-to-name').value;
+  customer = customer || '宛先未設定';
+  return `天野塗装_${getDocTypeName()}_${customer}_${d}.pdf`;
+}
+
+async function generatePDF() {
+  const content = $('printContent');
+  const pages = content.querySelectorAll('.print-page');
+  if (!pages.length) return null;
+
+  const { jsPDF } = window.jspdf;
+
+  // Use first page to determine orientation
+  const firstPage = pages[0];
+  const isEnvelope = firstPage.classList.contains('print-page-envelope');
+
+  let pdf;
+  if (isEnvelope && firstPage.classList.contains('naga3')) {
+    pdf = new jsPDF({ orientation:'portrait', unit:'mm', format:[120, 235] });
+  } else if (isEnvelope && firstPage.classList.contains('kaku2')) {
+    pdf = new jsPDF({ orientation:'portrait', unit:'mm', format:[240, 332] });
+  } else {
+    pdf = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  }
+
+  for (let i = 0; i < pages.length; i++) {
+    if (i > 0) pdf.addPage();
+    const canvas = await html2canvas(pages[i], {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      logging: false,
+    });
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const pdfW = pdf.internal.pageSize.getWidth();
+    const pdfH = pdf.internal.pageSize.getHeight();
+    pdf.addImage(imgData, 'JPEG', 0, 0, pdfW, pdfH);
+  }
+
+  return pdf;
+}
+
+async function saveCurrentToDrive() {
+  if (!accessToken) {
+    showToast('まずGoogleにログインしてください', 'error');
+    return;
+  }
+  // Generate preview first if not already showing
+  if (!$('printOverlay').classList.contains('show')) {
+    generate();
+  }
+  await saveToDriveFromPreview();
+}
+
+async function saveToDriveFromPreview() {
+  if (!accessToken) {
+    showToast('Googleにログインしてください', 'error');
+    return;
+  }
+
+  const btn = $('btnDriveOverlay');
+  const btnMain = $('btnDriveSave');
+  const origHTML = btn ? btn.innerHTML : '';
+  if (btn) btn.innerHTML = '<span class="spinner"></span> 保存中...';
+  if (btn) btn.disabled = true;
+  if (btnMain) btnMain.disabled = true;
+
+  try {
+    showToast('PDFを生成中...');
+    const pdf = await generatePDF();
+    if (!pdf) {
+      showToast('PDF生成に失敗しました', 'error');
+      return;
+    }
+
+    const pdfBlob = pdf.output('blob');
+    const fileName = getFileName();
+
+    showToast('Google Driveにアップロード中...');
+
+    // First ensure folder exists
+    const folderId = await getOrCreateFolder('天野塗装_帳票');
+
+    // Upload file
+    const metadata = {
+      name: fileName,
+      mimeType: 'application/pdf',
+      parents: [folderId]
+    };
+
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', pdfBlob);
+
+    const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + accessToken },
+      body: form
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      if (res.status === 401) {
+        showToast('セッション切れ。再ログインしてください', 'error');
+        accessToken = null;
+        currentUser = null;
+        updateAuthUI();
+        return;
+      }
+      throw new Error(err.error?.message || 'Upload failed');
+    }
+
+    const file = await res.json();
+    showToast(`✓ Driveに保存しました: ${fileName}`, 'success');
+
+  } catch (e) {
+    console.error(e);
+    showToast('保存に失敗: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.innerHTML = origHTML || '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7.71 3.5L1.15 15l4.58 7.5h13.54l4.58-7.5L17.29 3.5H7.71z"/></svg> Drive保存'; btn.disabled = !accessToken; }
+    if (btnMain) btnMain.disabled = !accessToken;
+  }
+}
+
+async function getOrCreateFolder(name) {
+  // Search for existing folder
+  const q = encodeURIComponent(`name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`, {
+    headers: { 'Authorization': 'Bearer ' + accessToken }
+  });
+  const data = await res.json();
+
+  if (data.files && data.files.length > 0) {
+    return data.files[0].id;
+  }
+
+  // Create folder
+  const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + accessToken,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name: name,
+      mimeType: 'application/vnd.google-apps.folder'
+    })
+  });
+  const folder = await createRes.json();
+  return folder.id;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Init
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 document.addEventListener('DOMContentLoaded', () => {
   const t = today();
   ['est-date','inv-date','rec-date'].forEach(id => { if($(id)) $(id).value = t; });
@@ -1065,15 +1510,32 @@ document.addEventListener('DOMContentLoaded', () => {
   const due = new Date(); due.setMonth(due.getMonth()+1);
   $('inv-due').value = due.toISOString().split('T')[0];
   updateEnvelopePreview();
+
+  // Init Google Identity Services when loaded
+  if (typeof google !== 'undefined' && google.accounts) {
+    initGoogleAuth();
+  } else {
+    // Wait for GIS to load
+    const check = setInterval(() => {
+      if (typeof google !== 'undefined' && google.accounts) {
+        clearInterval(check);
+        initGoogleAuth();
+      }
+    }, 200);
+  }
 });
 
-// ── Tab switching ──
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Tab switching
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab===tab));
   document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id==='panel-'+tab));
 }
 
-// ── Items management ──
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Items management
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function addItem(prefix) {
   const list = $(prefix+'-items');
   const row = document.createElement('div');
@@ -1127,7 +1589,9 @@ function calcReceipt() {
   $('rec-total').textContent = fmtYen(total);
 }
 
-// ── Envelope preview ──
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Envelope preview
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function updateEnvelopePreview() {
   const postal = $('env-to-postal').value;
   const digits = postal.replace(/\D/g,'');
@@ -1142,13 +1606,13 @@ function updateEnvelopePreview() {
   $('env-preview-from-addr').textContent = $('env-from-addr').value || '差出人住所';
 }
 
-// ── Company info block ──
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Document generation
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 function companyBlock() {
   return `
     <div class="doc-company-info">
       <div class="doc-company-name">天野塗装</div>
-      <div id="company-addr-line"></div>
-      <div id="company-tel-line"></div>
     </div>
   `;
 }
@@ -1163,24 +1627,28 @@ function stampArea() {
   `;
 }
 
-// ── Generate documents ──
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
 function generate() {
   const active = document.querySelector('.panel.active').id.replace('panel-','');
   let html = '';
 
-  if(active === 'estimate') {
-    html = generateEstimate();
-  } else if(active === 'invoice') {
-    html = generateInvoice();
-  } else if(active === 'receipt') {
-    html = generateReceipt();
-  } else if(active === 'envelope') {
-    html = generateEnvelope();
-  }
+  if(active === 'estimate') html = generateEstimate();
+  else if(active === 'invoice') html = generateInvoice();
+  else if(active === 'receipt') html = generateReceipt();
+  else if(active === 'envelope') html = generateEnvelope();
 
   $('printContent').innerHTML = html;
   $('printOverlay').classList.add('show');
   document.body.style.overflow = 'hidden';
+
+  // Update drive button state in overlay
+  const overlayBtn = $('btnDriveOverlay');
+  if (overlayBtn) overlayBtn.disabled = !accessToken;
 }
 
 function closePreview() {
@@ -1201,7 +1669,6 @@ function itemsTableHTML(prefix) {
       <td class="num">${fmtYen(i.amount)}</td>
     </tr>
   `).join('');
-  // Add empty rows to fill at least 5 rows
   const empty = Math.max(0, 5 - items.length);
   for(let i=0; i<empty; i++) {
     rows += `<tr><td>&nbsp;</td><td></td><td></td><td></td></tr>`;
@@ -1219,12 +1686,6 @@ function itemsTableHTML(prefix) {
       </tfoot>
     </table>
   `;
-}
-
-function esc(s) {
-  const d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
 }
 
 function generateEstimate() {
