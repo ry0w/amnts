@@ -553,32 +553,10 @@ body {
 
 <!-- ━━ 封筒 ━━ -->
 <div class="panel" id="panel-envelope">
-  <div class="card"><div class="card-head"><div class="card-head-icon">✉️</div><h3>封筒サイズ</h3></div>
-    <div class="card-body"><div class="field"><label>封筒種類</label><select id="env-size" onchange="updateEnvelopePreview()"><option value="naga3">長形3号（120×235mm）</option><option value="kaku2">角形2号（240×332mm）</option></select></div></div>
-  </div>
-  <div class="card"><div class="card-head"><div class="card-head-icon">👤</div><h3>宛先</h3></div>
-    <div class="card-body">
-      <div class="field"><label>郵便番号</label><input type="text" id="env-to-postal" placeholder="123-4567" oninput="updateEnvelopePreview()"></div>
-      <div class="field"><label>住所</label><textarea id="env-to-addr" rows="2" placeholder="東京都○○区○○町1-2-3" oninput="updateEnvelopePreview()"></textarea></div>
-      <div class="field"><label>宛名</label><input type="text" id="env-to-name" placeholder="株式会社○○" oninput="updateEnvelopePreview()"></div>
-      <div class="field"><label>敬称</label><select id="env-to-suffix" onchange="updateEnvelopePreview()"><option value="御中">御中</option><option value="様">様</option><option value="殿">殿</option></select></div>
-    </div>
-  </div>
-  <div class="card"><div class="card-head"><div class="card-head-icon">🏠</div><h3>差出人（天野塗装）</h3></div>
-    <div class="card-body">
-      <div class="field"><label>郵便番号</label><input type="text" id="env-from-postal" value="634-0071" oninput="updateEnvelopePreview()"></div>
-      <div class="field"><label>住所</label><textarea id="env-from-addr" rows="2" oninput="updateEnvelopePreview()">奈良県橿原市山之坊町66-25</textarea></div>
-    </div>
-  </div>
-  <div class="card"><div class="card-head"><div class="card-head-icon">👁</div><h3>プレビュー</h3></div>
-    <div class="card-body">
-      <div class="envelope-preview" id="env-preview">
-        <div class="postal-mark" id="env-postal-boxes"></div>
-        <div class="to-address" id="env-preview-addr">住所</div>
-        <div class="to-name" id="env-preview-name">宛名 <span class="to-suffix" id="env-preview-suffix">御中</span></div>
-        <div class="from-section"><div id="env-preview-from-postal" style="font-size:10px;"></div><div id="env-preview-from-addr">差出人住所</div><div class="from-name">天野塗装</div></div>
-      </div>
-    </div>
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:50vh;padding:40px 20px;text-align:center;">
+    <div style="font-size:64px;margin-bottom:16px;">✉️</div>
+    <div style="font-size:20px;font-weight:700;color:var(--text);letter-spacing:0.1em;margin-bottom:8px;">Coming Soon</div>
+    <div style="font-size:13px;color:var(--text-muted);line-height:1.8;">封筒印刷機能は現在開発中です。<br>今後のアップデートをお待ちください。</div>
   </div>
 </div>
 
@@ -836,6 +814,8 @@ async function downloadPDF() {
 // Save Dialog (Local)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━
 function openSaveDialog() {
+  const a=document.querySelector('.panel.active').id.replace('panel-','');
+  if(a==='envelope'){showToast('封筒機能は現在開発中です','');return;}
   const folder = getDocTypeFolder();
   const fname = getFileName();
   $('saveFolderSelect').value = folder;
@@ -1206,9 +1186,10 @@ function rightBlock(extraHTML) {
 
 function generate() {
   const a=document.querySelector('.panel.active').id.replace('panel-','');
+  if(a==='envelope'){showToast('封筒機能は現在開発中です','');return;}
   let h='';
   if(a==='estimate')h=generateEstimate(); else if(a==='invoice')h=generateInvoice();
-  else if(a==='receipt')h=generateReceipt(); else if(a==='envelope')h=generateEnvelope();
+  else if(a==='receipt')h=generateReceipt();
   $('printContent').innerHTML=h;$('printOverlay').classList.add('show');document.body.style.overflow='hidden';
   const ob=$('btnDriveOverlay');if(ob)ob.disabled=!accessToken;
 }
