@@ -660,11 +660,12 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s; re
 // ━━━━━━━━━━━━━━━━━━━━━━━━━
 function openDB() {
   return new Promise((resolve, reject) => {
+    if (!window.indexedDB) { reject(new Error('IndexedDB not supported')); return; }
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = e => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains(STORE_NAME)) {
+        const store = d.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
         store.createIndex('folder', 'folder', { unique: false });
         store.createIndex('createdAt', 'createdAt', { unique: false });
       }
@@ -674,8 +675,15 @@ function openDB() {
   });
 }
 
+async function ensureDB() {
+  if (db) return;
+  try { await openDB(); } catch(e) { console.error('DB init failed:', e); }
+}
+
 function dbAdd(record) {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
+    await ensureDB();
+    if (!db) { reject(new Error('データベースに接続できません')); return; }
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const req = tx.objectStore(STORE_NAME).add(record);
     req.onsuccess = () => resolve(req.result);
@@ -684,7 +692,9 @@ function dbAdd(record) {
 }
 
 function dbGetAll() {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
+    await ensureDB();
+    if (!db) { resolve([]); return; }
     const tx = db.transaction(STORE_NAME, 'readonly');
     const req = tx.objectStore(STORE_NAME).getAll();
     req.onsuccess = () => resolve(req.result);
@@ -693,7 +703,9 @@ function dbGetAll() {
 }
 
 function dbDelete(id) {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
+    await ensureDB();
+    if (!db) { reject(new Error('データベースに接続できません')); return; }
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const req = tx.objectStore(STORE_NAME).delete(id);
     req.onsuccess = () => resolve();
@@ -702,7 +714,9 @@ function dbDelete(id) {
 }
 
 function dbGet(id) {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
+    await ensureDB();
+    if (!db) { reject(new Error('データベースに接続できません')); return; }
     const tx = db.transaction(STORE_NAME, 'readonly');
     const req = tx.objectStore(STORE_NAME).get(id);
     req.onsuccess = () => resolve(req.result);
@@ -711,7 +725,9 @@ function dbGet(id) {
 }
 
 function dbUpdate(record) {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
+    await ensureDB();
+    if (!db) { reject(new Error('データベースに接続できません')); return; }
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const req = tx.objectStore(STORE_NAME).put(record);
     req.onsuccess = () => resolve(req.result);
@@ -840,8 +856,13 @@ async function executeSave() {
   btn.disabled = true; btn.textContent = '保存中...';
 
   try {
+    await ensureDB();
+    if(!db) { showToast('データベースに接続できません。ブラウザの設定を確認してください。','error'); return; }
+
     // Generate preview if not already
     if(!$('printOverlay').classList.contains('show')) { generate(); }
+    // Wait for DOM to render before html2canvas
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     showToast('PDFを生成中...');
     const pdf = await generatePDF();
@@ -1039,7 +1060,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateEnvelopePreview();
 
   // Init IndexedDB
-  await openDB();
+  try { await openDB(); } catch(e) { console.error('IndexedDB init error:', e); }
+
+  // Update storage display
+  try {
+    const allFiles = await dbGetAll();
+    const totalSize = allFiles.reduce((s,f) => s + (f.size||0), 0);
+    $('fmStorageText').textContent = `${fmtBytes(totalSize)} / ${allFiles.length}件`;
+    const pct = Math.min(100, (totalSize / (50*1048576))*100);
+    $('fmStorageFill').style.width = pct + '%';
+  } catch(e) {
+    $('fmStorageText').textContent = db ? '0B / 0件' : '利用不可';
+  }
 
   // Init Google
   if(typeof google!=='undefined'&&google.accounts) initGoogleAuth();
@@ -1078,6 +1110,8 @@ function calcReceipt() {
 // Envelope preview
 // ━━━━━━━━━━━━━━━━━━━━━━━━━
 function updateEnvelopePreview() {
+  // Envelope is Coming Soon — skip if elements don't exist
+  if(!$('env-to-postal')) return;
   const postal=$('env-to-postal').value,digits=postal.replace(/\D/g,'');
   let boxes='';for(let i=0;i<7;i++) boxes+=`<div class="box">${digits[i]||''}</div>`;
   $('env-postal-boxes').innerHTML=boxes;
