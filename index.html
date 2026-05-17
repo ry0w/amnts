@@ -1157,11 +1157,11 @@ body {
     <div class="card-body">
       <div class="field">
         <label>郵便番号</label>
-        <input type="text" id="env-from-postal" placeholder="987-6543" oninput="updateEnvelopePreview()">
+        <input type="text" id="env-from-postal" value="634-0071" oninput="updateEnvelopePreview()">
       </div>
       <div class="field">
         <label>住所</label>
-        <textarea id="env-from-addr" rows="2" placeholder="○○県○○市○○1-2-3" oninput="updateEnvelopePreview()"></textarea>
+        <textarea id="env-from-addr" rows="2" oninput="updateEnvelopePreview()">奈良県橿原市山之坊町66-25</textarea>
       </div>
     </div>
   </div>
@@ -1613,6 +1613,10 @@ function companyBlock() {
   return `
     <div class="doc-company-info">
       <div class="doc-company-name">天野塗装</div>
+      <div>代表　天野 望</div>
+      <div>〒634-0071</div>
+      <div>奈良県橿原市山之坊町66-25</div>
+      <div>TEL: 080-2420-8524</div>
     </div>
   `;
 }
