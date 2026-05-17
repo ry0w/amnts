@@ -288,9 +288,10 @@ body {
 .doc-table tfoot td { border-top:2px solid #111; font-weight:600; }
 .doc-notes { margin-top:8mm; padding:4mm; border:1px solid #ccc; font-size:11px; line-height:1.8; min-height:20mm; }
 .doc-notes-title { font-weight:600; margin-bottom:2mm; font-size:12px; }
-.doc-stamp-area { position:absolute; top:22mm; right:15mm; display:flex; gap:3mm; }
-.stamp-box { width:18mm; height:22mm; border:1px solid #999; display:flex; flex-direction:column; }
-.stamp-box .stamp-label { text-align:center; font-size:8px; border-bottom:1px solid #999; padding:1mm 0; background:#f9f6f2; }
+.doc-right-block { display:flex; flex-direction:column; align-items:flex-end; }
+.doc-stamp-area { display:flex; gap:2mm; margin-bottom:4mm; }
+.stamp-box { width:16mm; height:20mm; border:1px solid #999; display:flex; flex-direction:column; }
+.stamp-box .stamp-label { text-align:center; font-size:7px; border-bottom:1px solid #999; padding:0.5mm 0; background:#f9f6f2; }
 .stamp-box .stamp-space { flex:1; }
 .doc-company-info { font-size:11px; line-height:2; text-align:right; }
 .doc-company-name { font-size:16px; font-weight:700; letter-spacing:0.1em; }
@@ -731,6 +732,15 @@ function dbGet(id) {
   });
 }
 
+function dbUpdate(record) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const req = tx.objectStore(STORE_NAME).put(record);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = e => reject(e.target.error);
+  });
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━
 // Google Auth
 // ━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -866,6 +876,7 @@ async function executeSave() {
       data: arrayBuffer,
       size: arrayBuffer.byteLength,
       mimeType: 'application/pdf',
+      formData: collectFormData(),
       createdAt: new Date().toISOString(),
     });
 
@@ -946,6 +957,7 @@ async function renderFileManager() {
             <div class="fm-file-meta"><span>${dateStr}</span><span>${fmtBytes(f.size||0)}</span></div>
           </div>
           <div class="fm-file-actions">
+            ${f.formData?`<button onclick="fmEdit(${f.id})" title="編集">✏️</button>`:''}
             <button onclick="fmDownload(${f.id})" title="ダウンロード">⬇</button>
             <button onclick="fmPreview(${f.id})" title="プレビュー">👁</button>
             <button class="delete" onclick="fmDeleteConfirm(${f.id},'${esc(f.fileName)}')" title="削除">🗑</button>
@@ -986,6 +998,14 @@ async function fmDeleteConfirm(id, name) {
   await dbDelete(id);
   showToast('削除しました: ' + name);
   await renderFileManager();
+}
+
+async function fmEdit(id) {
+  const file = await dbGet(id);
+  if(!file || !file.formData) { showToast('このファイルは編集データがありません','error'); return; }
+  restoreFormData(file.formData);
+  closeFileManager();
+  showToast(`「${file.fileName}」を読み込みました。編集後に再保存してください。`, 'success');
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1088,13 +1108,100 @@ function updateEnvelopePreview() {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━
+// Form data collect / restore (for edit)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━
+function collectFormData() {
+  const a = document.querySelector('.panel.active').id.replace('panel-','');
+  const data = { docType: a };
+  if(a==='estimate') {
+    data.date=$('est-date').value; data.number=$('est-number').value;
+    data.customer=$('est-customer').value; data.subject=$('est-subject').value;
+    data.expiry=$('est-expiry').value; data.delivery=$('est-delivery').value;
+    data.items=getItems('est'); data.notes=$('est-notes').value;
+  } else if(a==='invoice') {
+    data.date=$('inv-date').value; data.number=$('inv-number').value;
+    data.customer=$('inv-customer').value; data.subject=$('inv-subject').value;
+    data.due=$('inv-due').value; data.bank=$('inv-bank').value;
+    data.actype=$('inv-actype').value; data.acnum=$('inv-acnum').value;
+    data.acname=$('inv-acname').value; data.items=getItems('inv'); data.notes=$('inv-notes').value;
+  } else if(a==='receipt') {
+    data.date=$('rec-date').value; data.number=$('rec-number').value;
+    data.customer=$('rec-customer').value; data.amount=$('rec-amount').value;
+    data.proviso=$('rec-proviso').value; data.notes=$('rec-notes').value;
+  } else if(a==='envelope') {
+    data.size=$('env-size').value; data.toPostal=$('env-to-postal').value;
+    data.toAddr=$('env-to-addr').value; data.toName=$('env-to-name').value;
+    data.toSuffix=$('env-to-suffix').value; data.fromPostal=$('env-from-postal').value;
+    data.fromAddr=$('env-from-addr').value;
+  }
+  return data;
+}
+
+function restoreFormData(data) {
+  const a = data.docType;
+  // Switch to correct tab
+  const tabMap = {estimate:'estimate',invoice:'invoice',receipt:'receipt',envelope:'envelope'};
+  switchTab(tabMap[a]||a);
+
+  if(a==='estimate') {
+    $('est-date').value=data.date||''; $('est-number').value=data.number||'';
+    $('est-customer').value=data.customer||''; $('est-subject').value=data.subject||'';
+    $('est-expiry').value=data.expiry||''; $('est-delivery').value=data.delivery||'';
+    $('est-notes').value=data.notes||'';
+    restoreItems('est', data.items||[]);
+    calcTotals('est');
+  } else if(a==='invoice') {
+    $('inv-date').value=data.date||''; $('inv-number').value=data.number||'';
+    $('inv-customer').value=data.customer||''; $('inv-subject').value=data.subject||'';
+    $('inv-due').value=data.due||''; $('inv-bank').value=data.bank||'';
+    $('inv-actype').value=data.actype||'普通'; $('inv-acnum').value=data.acnum||'';
+    $('inv-acname').value=data.acname||''; $('inv-notes').value=data.notes||'';
+    restoreItems('inv', data.items||[]);
+    calcTotals('inv');
+  } else if(a==='receipt') {
+    $('rec-date').value=data.date||''; $('rec-number').value=data.number||'';
+    $('rec-customer').value=data.customer||''; $('rec-amount').value=data.amount||'';
+    $('rec-proviso').value=data.proviso||''; $('rec-notes').value=data.notes||'';
+    calcReceipt();
+  } else if(a==='envelope') {
+    $('env-size').value=data.size||'naga3'; $('env-to-postal').value=data.toPostal||'';
+    $('env-to-addr').value=data.toAddr||''; $('env-to-name').value=data.toName||'';
+    $('env-to-suffix').value=data.toSuffix||'御中'; $('env-from-postal').value=data.fromPostal||'';
+    $('env-from-addr').value=data.fromAddr||'';
+    updateEnvelopePreview();
+  }
+}
+
+function restoreItems(prefix, items) {
+  const list = $(prefix+'-items');
+  list.innerHTML = '';
+  if(!items.length) items = [{name:'',qty:1,price:0}];
+  items.forEach(it => {
+    const row = document.createElement('div'); row.className='item-row';
+    row.innerHTML=`<input type="text" value="${esc(it.name)}" oninput="calcTotals('${prefix}')"><input type="number" value="${it.qty}" min="0" oninput="calcTotals('${prefix}')"><input type="number" value="${it.price}" min="0" oninput="calcTotals('${prefix}')"><button class="btn-remove" onclick="removeItem(this,'${prefix}')">×</button>`;
+    list.appendChild(row);
+  });
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━
 // Document generation
 // ━━━━━━━━━━━━━━━━━━━━━━━━━
-function companyBlock() {
-  return `<div class="doc-company-info"><div class="doc-company-name">天野塗装</div><div>代表　天野 望</div><div>〒634-0071</div><div>奈良県橿原市山之坊町66-25</div><div>TEL: 080-2420-8524</div></div>`;
-}
-function stampArea() {
-  return `<div class="doc-stamp-area"><div class="stamp-box"><div class="stamp-label">承認</div><div class="stamp-space"></div></div><div class="stamp-box"><div class="stamp-label">確認</div><div class="stamp-space"></div></div><div class="stamp-box"><div class="stamp-label">担当</div><div class="stamp-space"></div></div></div>`;
+function rightBlock(extraHTML) {
+  return `<div class="doc-right-block">
+    <div class="doc-stamp-area">
+      <div class="stamp-box"><div class="stamp-label">承認</div><div class="stamp-space"></div></div>
+      <div class="stamp-box"><div class="stamp-label">確認</div><div class="stamp-space"></div></div>
+      <div class="stamp-box"><div class="stamp-label">担当</div><div class="stamp-space"></div></div>
+    </div>
+    <div class="doc-company-info">
+      <div class="doc-company-name">天野塗装</div>
+      <div>代表　天野 望</div>
+      <div>〒634-0071</div>
+      <div>奈良県橿原市山之坊町66-25</div>
+      <div>TEL: 080-2420-8524</div>
+    </div>
+    <div style="margin-top:3mm;text-align:right;font-size:11px;line-height:1.8;">${extraHTML}</div>
+  </div>`;
 }
 
 function generate() {
@@ -1116,17 +1223,20 @@ function itemsTableHTML(prefix) {
 
 function generateEstimate() {
   const items=getItems('est'),sub=items.reduce((s,i)=>s+i.amount,0),tax=Math.floor(sub*0.1),tot=sub+tax;
-  return `<div class="print-page">${stampArea()}<div class="doc-title">見 積 書</div><div class="doc-meta"><div class="left"><span class="customer-name">${esc($('est-customer').value||'　')}</span><span class="sama"> 御中</span><br><br><div style="font-size:12px">件名：${esc($('est-subject').value||'')}</div></div><div class="right">${companyBlock()}<br><div class="doc-number">見積番号：${esc($('est-number').value||'')}</div><div>見積日：${fmtDate($('est-date').value)}</div><div>有効期限：${fmtDate($('est-expiry').value)}</div></div></div><div class="doc-amount-box"><span class="label">お見積金額（税込）</span><span>${fmtYen(tot)}</span></div>${itemsTableHTML('est')}<div style="font-size:11px;margin-top:4mm;">納期：${esc($('est-delivery').value||'別途ご相談')}</div>${$('est-notes').value?`<div class="doc-notes"><div class="doc-notes-title">備考</div>${esc($('est-notes').value).replace(/\n/g,'<br>')}</div>`:''}<div class="doc-footer">天野塗装</div></div>`;
+  const extra=`<div class="doc-number">見積番号：${esc($('est-number').value||'')}</div><div>見積日：${fmtDate($('est-date').value)}</div><div>有効期限：${fmtDate($('est-expiry').value)}</div>`;
+  return `<div class="print-page"><div class="doc-title">見 積 書</div><div class="doc-meta"><div class="left"><span class="customer-name">${esc($('est-customer').value||'　')}</span><span class="sama"> 御中</span><br><br><div style="font-size:12px">件名：${esc($('est-subject').value||'')}</div></div>${rightBlock(extra)}</div><div class="doc-amount-box"><span class="label">お見積金額（税込）</span><span>${fmtYen(tot)}</span></div>${itemsTableHTML('est')}<div style="font-size:11px;margin-top:4mm;">納期：${esc($('est-delivery').value||'別途ご相談')}</div>${$('est-notes').value?`<div class="doc-notes"><div class="doc-notes-title">備考</div>${esc($('est-notes').value).replace(/\n/g,'<br>')}</div>`:''}<div class="doc-footer">天野塗装</div></div>`;
 }
 
 function generateInvoice() {
   const items=getItems('inv'),sub=items.reduce((s,i)=>s+i.amount,0),tax=Math.floor(sub*0.1),tot=sub+tax;
-  return `<div class="print-page">${stampArea()}<div class="doc-title">請 求 書</div><div class="doc-meta"><div class="left"><span class="customer-name">${esc($('inv-customer').value||'　')}</span><span class="sama"> 御中</span><br><br><div style="font-size:12px">件名：${esc($('inv-subject').value||'')}</div></div><div class="right">${companyBlock()}<br><div class="doc-number">請求番号：${esc($('inv-number').value||'')}</div><div>請求日：${fmtDate($('inv-date').value)}</div><div>お支払期限：${fmtDate($('inv-due').value)}</div></div></div><div class="doc-amount-box"><span class="label">ご請求金額（税込）</span><span>${fmtYen(tot)}</span></div>${itemsTableHTML('inv')}${$('inv-bank').value?`<div class="doc-notes"><div class="doc-notes-title">お振込先</div>${esc($('inv-bank').value)}<br>${esc($('inv-actype').value)}　口座番号：${esc($('inv-acnum').value)}<br>口座名義：${esc($('inv-acname').value)}</div>`:''}${$('inv-notes').value?`<div class="doc-notes" style="margin-top:4mm;"><div class="doc-notes-title">備考</div>${esc($('inv-notes').value).replace(/\n/g,'<br>')}</div>`:''}<div class="doc-footer">天野塗装</div></div>`;
+  const extra=`<div class="doc-number">請求番号：${esc($('inv-number').value||'')}</div><div>請求日：${fmtDate($('inv-date').value)}</div><div>お支払期限：${fmtDate($('inv-due').value)}</div>`;
+  return `<div class="print-page"><div class="doc-title">請 求 書</div><div class="doc-meta"><div class="left"><span class="customer-name">${esc($('inv-customer').value||'　')}</span><span class="sama"> 御中</span><br><br><div style="font-size:12px">件名：${esc($('inv-subject').value||'')}</div></div>${rightBlock(extra)}</div><div class="doc-amount-box"><span class="label">ご請求金額（税込）</span><span>${fmtYen(tot)}</span></div>${itemsTableHTML('inv')}${$('inv-bank').value?`<div class="doc-notes"><div class="doc-notes-title">お振込先</div>${esc($('inv-bank').value)}<br>${esc($('inv-actype').value)}　口座番号：${esc($('inv-acnum').value)}<br>口座名義：${esc($('inv-acname').value)}</div>`:''}${$('inv-notes').value?`<div class="doc-notes" style="margin-top:4mm;"><div class="doc-notes-title">備考</div>${esc($('inv-notes').value).replace(/\n/g,'<br>')}</div>`:''}<div class="doc-footer">天野塗装</div></div>`;
 }
 
 function generateReceipt() {
   const t=parseFloat($('rec-amount').value)||0,sub=Math.floor(t/1.1),tax=t-sub;
-  return `<div class="print-page">${stampArea()}<div class="doc-title">領 収 書</div><div class="doc-meta"><div class="left"><span class="customer-name">${esc($('rec-customer').value||'　')}</span><span class="sama"> 様</span></div><div class="right">${companyBlock()}<br><div class="doc-number">領収書番号：${esc($('rec-number').value||'')}</div><div>発行日：${fmtDate($('rec-date').value)}</div></div></div><div class="doc-amount-box"><span class="label">領収金額</span><span>${fmtYen(t)}</span></div><div class="receipt-proviso">但し、${esc($('rec-proviso').value||'塗装工事代として')}</div><div style="margin-top:6mm;"><table class="doc-table"><tr><th>税抜金額</th><th>消費税額（10%）</th><th>税込金額</th></tr><tr><td class="num">${fmtYen(sub)}</td><td class="num">${fmtYen(tax)}</td><td class="num">${fmtYen(t)}</td></tr></table></div>${$('rec-notes').value?`<div class="doc-notes" style="margin-top:6mm;"><div class="doc-notes-title">備考</div>${esc($('rec-notes').value).replace(/\n/g,'<br>')}</div>`:''}<div style="margin-top:12mm;text-align:right;"><div style="display:inline-block;width:50mm;height:50mm;border:1px solid #ccc;text-align:center;line-height:50mm;font-size:10px;color:#999;">印紙貼付欄</div></div><div class="doc-footer">天野塗装　※この領収書は税務処理にご利用いただけます</div></div>`;
+  const extra=`<div class="doc-number">領収書番号：${esc($('rec-number').value||'')}</div><div>発行日：${fmtDate($('rec-date').value)}</div>`;
+  return `<div class="print-page"><div class="doc-title">領 収 書</div><div class="doc-meta"><div class="left"><span class="customer-name">${esc($('rec-customer').value||'　')}</span><span class="sama"> 様</span></div>${rightBlock(extra)}</div><div class="doc-amount-box"><span class="label">領収金額</span><span>${fmtYen(t)}</span></div><div class="receipt-proviso">但し、${esc($('rec-proviso').value||'塗装工事代として')}</div><div style="margin-top:6mm;"><table class="doc-table"><tr><th>税抜金額</th><th>消費税額（10%）</th><th>税込金額</th></tr><tr><td class="num">${fmtYen(sub)}</td><td class="num">${fmtYen(tax)}</td><td class="num">${fmtYen(t)}</td></tr></table></div>${$('rec-notes').value?`<div class="doc-notes" style="margin-top:6mm;"><div class="doc-notes-title">備考</div>${esc($('rec-notes').value).replace(/\n/g,'<br>')}</div>`:''}<div style="margin-top:12mm;text-align:right;"><div style="display:inline-block;width:50mm;height:50mm;border:1px solid #ccc;text-align:center;line-height:50mm;font-size:10px;color:#999;">印紙貼付欄</div></div><div class="doc-footer">天野塗装　※この領収書は税務処理にご利用いただけます</div></div>`;
 }
 
 function generateEnvelope() {
